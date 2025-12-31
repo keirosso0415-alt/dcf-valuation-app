@@ -1500,11 +1500,39 @@ def render_header():
     """, unsafe_allow_html=True)
 
 
+def reset_session_state():
+    """セッションステートをリセット（新しい企業分析用）"""
+    keys_to_reset = [
+        "company_name",
+        "calculated_revenue_growth",
+        "calculated_cogs_ratio", 
+        "calculated_sga_ratio",
+        "calculated_cost_of_debt",
+        "cost_of_debt_status",
+        "base_year",
+        "fetched_stock_price",
+        "fetched_company_name",
+        "edinet_extracted",
+        "edinet_manual_inputs",
+        "csv_historical_data",
+        "current_excel_file",
+        "current_csv_file",
+    ]
+    for key in keys_to_reset:
+        if key in st.session_state:
+            del st.session_state[key]
+
+
 def render_sidebar() -> dict:
     """サイドバー（入力パネル）"""
     with st.sidebar:
         # === Excelアップロード（最上部） ===
         st.markdown('<div class="sidebar-header">財務データ入力</div>', unsafe_allow_html=True)
+        
+        # リセットボタン
+        if st.button("🔄 データをリセット", help="現在のデータをクリアして新しい企業を分析"):
+            reset_session_state()
+            st.rerun()
 
         # テンプレートダウンロード
         template_file = create_excel_template()
@@ -1520,12 +1548,24 @@ def render_sidebar() -> dict:
         uploaded_file = st.file_uploader(
             "Excelファイルをアップロード",
             type=["xlsx", "xls"],
-            help="テンプレートに財務データを入力してアップロードしてください"
+            help="テンプレートに財務データを入力してアップロードしてください",
+            key="excel_uploader"
         )
 
         # アップロードされたファイルからデータを読み込む
         historical_data = None
         if uploaded_file is not None:
+            # ファイル名が変わったら自動リセット
+            current_file_name = uploaded_file.name
+            previous_file_name = st.session_state.get("current_excel_file")
+            
+            if previous_file_name and previous_file_name != current_file_name:
+                # 新しいファイルがアップロードされた
+                reset_session_state()
+                st.info(f"新しいファイル「{current_file_name}」を読み込みます")
+            
+            st.session_state["current_excel_file"] = current_file_name
+            
             try:
                 historical_data, excel_company_name, excel_ratios = read_excel_data(uploaded_file)
                 
@@ -1589,11 +1629,23 @@ def render_sidebar() -> dict:
         csv_file = st.file_uploader(
             "CSVファイルをアップロード",
             type=["csv"],
-            help="EDINET形式のCSVファイル（UTF-16推奨）"
+            help="EDINET形式のCSVファイル（UTF-16推奨）",
+            key="csv_uploader"
         )
 
         csv_historical_data = None
         if csv_file is not None:
+            # ファイル名が変わったら自動リセット
+            current_csv_name = csv_file.name
+            previous_csv_name = st.session_state.get("current_csv_file")
+            
+            if previous_csv_name and previous_csv_name != current_csv_name:
+                # 新しいCSVファイルがアップロードされた
+                reset_session_state()
+                st.info(f"新しいファイル「{current_csv_name}」を読み込みます")
+            
+            st.session_state["current_csv_file"] = current_csv_name
+            
             try:
                 # CSVを読み込み（エンコーディング自動判定）
                 df_csv = read_edinet_csv(csv_file)
